@@ -333,9 +333,198 @@ def generate_excel(id_incident: int):
     wb.save(out)
     out.seek(0)
 
+    # Modify drawings in zip bytes
+    zip_bytes = out.getvalue()
+    modified_zip_bytes = modify_excel_zip_with_drawings_py(zip_bytes, incident["injury"] or "", factors)
+    out_modified = BytesIO(modified_zip_bytes)
+
     filename = f"reporte_{incident['incident_folio'] or id_incident}.xlsx"
     return StreamingResponse(
-        out,
+        out_modified,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+def modify_excel_zip_with_drawings_py(zip_bytes, injury_text, factors):
+    import zipfile
+    import xml.etree.ElementTree as ET
+    import io
+    import copy
+
+    namespaces = {
+        'xdr': 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing',
+        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+        'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+    }
+
+    # Register namespaces for ET serialization
+    for prefix, uri in namespaces.items():
+        ET.register_namespace(prefix, uri)
+
+    in_file = io.BytesIO(zip_bytes)
+    out_file = io.BytesIO()
+
+    try:
+        with zipfile.ZipFile(in_file, 'r') as yin:
+            with zipfile.ZipFile(out_file, 'w') as yout:
+                for item in yin.infolist():
+                    data = yin.read(item.filename)
+                    if item.filename == 'xl/drawings/drawing1.xml':
+                        # Parse and modify XML
+                        root = ET.fromstring(data)
+                        new_anchors = list(root[:11])
+                        
+                        lesion_anchor = copy.deepcopy(root[11])
+                        set_shape_text_py(lesion_anchor, injury_text, namespaces)
+                        new_anchors.append(lesion_anchor)
+                        
+                        template_shapes = {idx: root[idx] for idx in range(12, 20)}
+                        
+                        categories = [
+                            {"name": "Mano de Obra", "match": ["mano de obra", "mano"], "offset": 0},
+                            {"name": "Método", "match": ["metodo", "método"], "offset": 2},
+                            {"name": "Maquinaria", "match": ["maquinaria", "máquinaria"], "offset": 4},
+                            {"name": "Materiales", "match": ["material", "materiales"], "offset": 6}
+                        ]
+                        
+                        next_id = 100
+                        for cat in categories:
+                            factor = None
+                            for f in factors:
+                                f_4m = str(f.get("4m") or f.get("m4") or "").lower().strip()
+                                if any(m in f_4m for m in cat["match"]):
+                                    factor = f
+                                    break
+                                    
+                            offset = cat["offset"]
+                            
+                            # Cat Shape
+                            cat_shape = copy.deepcopy(template_shapes[12])
+                            shift_anchor_row_py(cat_shape, offset, namespaces)
+                            set_shape_text_py(cat_shape, cat["name"], namespaces)
+                            set_shape_id_py(cat_shape, next_id, namespaces)
+                            next_id += 1
+                            new_anchors.append(cat_shape)
+                            
+                            # Details
+                            f_text = factor.get("factor") if factor else ""
+                            cp_text = factor.get("control_point") if factor else ""
+                            std_text = factor.get("standard") if factor else ""
+                            act_text = factor.get("actual") if factor else ""
+                            comm_text = factor.get("comments") if factor else ""
+                            
+                            # Factor
+                            s_factor = copy.deepcopy(template_shapes[13])
+                            shift_anchor_row_py(s_factor, offset, namespaces)
+                            set_shape_text_py(s_factor, f_text, namespaces)
+                            set_shape_id_py(s_factor, next_id, namespaces)
+                            next_id += 1
+                            new_anchors.append(s_factor)
+                            
+                            # CP
+                            s_cp = copy.deepcopy(template_shapes[14])
+                            shift_anchor_row_py(s_cp, offset, namespaces)
+                            set_shape_text_py(s_cp, cp_text, namespaces)
+                            set_shape_id_py(s_cp, next_id, namespaces)
+                            next_id += 1
+                            new_anchors.append(s_cp)
+                            
+                            # Std
+                            s_std = copy.deepcopy(template_shapes[15])
+                            shift_anchor_row_py(s_std, offset, namespaces)
+                            set_shape_text_py(s_std, std_text, namespaces)
+                            set_shape_id_py(s_std, next_id, namespaces)
+                            next_id += 1
+                            new_anchors.append(s_std)
+                            
+                            # Act
+                            s_act = copy.deepcopy(template_shapes[16])
+                            shift_anchor_row_py(s_act, offset, namespaces)
+                            set_shape_text_py(s_act, act_text, namespaces)
+                            set_shape_id_py(s_act, next_id, namespaces)
+                            next_id += 1
+                            new_anchors.append(s_act)
+                            
+                            # Comments
+                            s_comm = copy.deepcopy(template_shapes[19])
+                            shift_anchor_row_py(s_comm, offset, namespaces)
+                            set_shape_text_py(s_comm, comm_text, namespaces)
+                            set_shape_id_py(s_comm, next_id, namespaces)
+                            next_id += 1
+                            new_anchors.append(s_comm)
+                            
+                            # Judgment
+                            if factor:
+                                met_std = factor.get("met_standard") in [True, "SÍ", "SI", "true", 1]
+                                met_saf = factor.get("met_safety") in [True, "SÍ", "SI", "true", 1]
+                                
+                                norma_shape = make_judgment_shape_py(template_shapes, met_std, offset, 40, next_id, namespaces)
+                                next_id += 1
+                                new_anchors.append(norma_shape)
+                                
+                                safety_shape = make_judgment_shape_py(template_shapes, met_saf, offset, 43, next_id, namespaces)
+                                next_id += 1
+                                new_anchors.append(safety_shape)
+                        
+                        root.clear()
+                        for anchor in new_anchors:
+                            root.append(anchor)
+                        
+                        modified_data = ET.tostring(root, encoding='utf-8', xml_declaration=True)
+                        yout.writestr(item.filename, modified_data)
+                    else:
+                        yout.writestr(item, data)
+        return out_file.getvalue()
+    except Exception as e:
+        print("Error modifying zip with drawings in Python:", e)
+        return zip_bytes
+
+def shift_anchor_row_py(anchor, offset, namespaces):
+    if offset == 0:
+        return
+    from_row = anchor.find('.//xdr:from/xdr:row', namespaces)
+    to_row = anchor.find('.//xdr:to/xdr:row', namespaces)
+    if from_row is not None:
+        from_row.text = str(int(from_row.text) + offset)
+    if to_row is not None:
+        to_row.text = str(int(to_row.text) + offset)
+
+def set_shape_id_py(anchor, new_id, namespaces):
+    cNvPr = anchor.find('.//xdr:cNvPr', namespaces)
+    if cNvPr is not None:
+        cNvPr.attrib['id'] = str(new_id)
+
+def set_shape_text_py(anchor, text, namespaces):
+    import xml.etree.ElementTree as ET
+    txBody = anchor.find('.//xdr:txBody', namespaces)
+    if txBody is None:
+        return
+    p = txBody.find('a:p', namespaces)
+    if p is None:
+        p = ET.SubElement(txBody, '{http://schemas.openxmlformats.org/drawingml/2006/main}p')
+    for child in list(p):
+        p.remove(child)
+    if text:
+        r = ET.SubElement(p, '{http://schemas.openxmlformats.org/drawingml/2006/main}r')
+        rPr = ET.SubElement(r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+        rPr.attrib['lang'] = 'es-MX'
+        rPr.attrib['sz'] = '1000'
+        t = ET.SubElement(r, '{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+        t.text = str(text)
+    else:
+        ET.SubElement(p, '{http://schemas.openxmlformats.org/drawingml/2006/main}endParaRPr')
+
+def make_judgment_shape_py(template_shapes, is_ok, offset, col_start, next_id, namespaces):
+    import copy
+    tpl_idx = 17 if is_ok else 18
+    shape = copy.deepcopy(template_shapes[tpl_idx])
+    set_shape_id_py(shape, next_id, namespaces)
+    shift_anchor_row_py(shape, offset, namespaces)
+    from_col = shape.find('.//xdr:from/xdr:col', namespaces)
+    to_col = shape.find('.//xdr:to/xdr:col', namespaces)
+    if from_col is not None:
+        span = int(to_col.text) - int(from_col.text)
+        from_col.text = str(col_start)
+        if to_col is not None:
+            to_col.text = str(col_start + span)
+    return shape
