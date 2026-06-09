@@ -9,7 +9,7 @@ router = APIRouter()
 def create_area(payload: AreaRequest):
     try:
         nueva_area = query_db(
-            "INSERT INTO area (nombre) VALUES (%s) RETURNING *",
+            "INSERT INTO area (name) VALUES (%s) RETURNING *",
             [payload.area],
             fetch_one=True
         )
@@ -62,7 +62,7 @@ def get_area_by_id(id: int):
 def update_area(id: int, payload: AreaRequest):
     try:
         area_actualizada = query_db(
-            "UPDATE area SET nombre = %s WHERE id = %s RETURNING *",
+            "UPDATE area SET name = %s WHERE id = %s RETURNING *",
             [payload.area, id],
             fetch_one=True
         )

@@ -29,11 +29,12 @@ def generate_excel(id_incident: int):
             factors = []
             countermeasures = []
             participants = []
+            hazard_backgrounds = []
             hazard_background = None
             intervening_factors = []
             
             if format_id:
-                cur.execute("SELECT * FROM factor_tree WHERE id_incident_format = %s", [format_id])
+                cur.execute("SELECT * FROM factor_tree WHERE id_incident_format = %s ORDER BY id ASC", [format_id])
                 factors = cur.fetchall()
                 
                 cur.execute("SELECT * FROM countermeasure_plan WHERE id_incident_format = %s", [format_id])
@@ -42,8 +43,10 @@ def generate_excel(id_incident: int):
                 cur.execute("SELECT * FROM analysis_participant WHERE id_incident_format = %s", [format_id])
                 participants = cur.fetchall()
                 
-                cur.execute("SELECT * FROM hazard_background WHERE id_incident_format = %s", [format_id])
-                hazard_background = cur.fetchone()
+                # Obtener todos los campos del hazard_background (antecedentes de peligro)
+                cur.execute("SELECT * FROM hazard_background WHERE id_incident_format = %s ORDER BY id ASC", [format_id])
+                hazard_backgrounds = cur.fetchall()
+                hazard_background = hazard_backgrounds[0] if hazard_backgrounds else None
                 
                 cur.execute("SELECT * FROM intervening_factors WHERE id_incident_format = %s", [format_id])
                 intervening_factors = cur.fetchall()
@@ -163,117 +166,244 @@ def generate_excel(id_incident: int):
     if junior: set_cell("AS21", junior["full_name"])
 
     set_cell("C28", incident["description"] or "")
+
+    # =========================================================
+    # CAUSA RAÍZ (row 55 fija en template)
+    # =========================================================
     set_cell("C55", incident["root_cause"] or "")
 
-    # Hazard Background
+    # =========================================================
+    # ANTECEDENTES DE PELIGRO - Sección 7
+    # Referencia visual: Reporte de incidente IMEX.xls sección 7
+    # Se escribe ANTES de insertar filas del árbol de factores.
+    # openpyxl desplaza automáticamente los valores cuando se llama insert_rows.
+    # =========================================================
+    def _col_num(col_str):
+        """Convierte letras de columna a número (A=1, Z=26, AA=27, etc.)"""
+        from openpyxl.utils import column_index_from_string
+        return column_index_from_string(col_str)
+
     if hazard_background:
-        if hazard_background["previous_fr1_incidents_presented"] is True:
-            ws["N61"].fill = black_fill
-        elif hazard_background["previous_fr1_incidents_presented"] is False:
-            ws["D61"].fill = black_fill
+        # Row 61: ¿Se han presentado incidentes FR1 previos? + Revisión horizontal
+        try:
+            if hazard_background.get("previous_fr1_incidents_presented") is True:
+                ws.cell(row=61, column=_col_num("N")).fill = black_fill
+            elif hazard_background.get("previous_fr1_incidents_presented") is False:
+                ws.cell(row=61, column=_col_num("D")).fill = black_fill
+        except Exception:
+            pass
+        try:
+            if hazard_background.get("horizontal_review") is True:
+                ws.cell(row=61, column=_col_num("AJ")).fill = black_fill
+                ws.cell(row=61, column=_col_num("AT")).value = hazard_background.get("horizontal_review_comment") or ""
+            elif hazard_background.get("horizontal_review") is False:
+                ws.cell(row=61, column=_col_num("AO")).fill = black_fill
+        except Exception:
+            pass
 
-        if hazard_background["existing_processes_or_areas_potential_for_incident"] is True:
-            ws["N66"].fill = black_fill
-            set_cell("W66", hazard_background["processes_or_areas_potential_for_incident"] or "")
-        elif hazard_background["existing_processes_or_areas_potential_for_incident"] is False:
-            ws["D66"].fill = black_fill
+        # Row 66: ¿Existen procesos/áreas con potencial de incidente?
+        try:
+            if hazard_background.get("existing_processes_or_areas_potential_for_incident") is True:
+                ws.cell(row=66, column=_col_num("N")).fill = black_fill
+                ws.cell(row=66, column=_col_num("W")).value = hazard_background.get("processes_or_areas_potential_for_incident") or ""
+            elif hazard_background.get("existing_processes_or_areas_potential_for_incident") is False:
+                ws.cell(row=66, column=_col_num("D")).fill = black_fill
+        except Exception:
+            pass
 
-        if hazard_background["horizontal_review"] is True:
-            ws["AJ61"].fill = black_fill
-            set_cell("AT61", hazard_background["horizontal_review_comment"] or "")
-        elif hazard_background["horizontal_review"] is False:
-            ws["AO61"].fill = black_fill
+        # Row 71: Riesgo identificado / nueva evaluación necesaria
+        try:
+            if hazard_background.get("risk_assessed_and_identified") is True:
+                ws.cell(row=71, column=_col_num("N")).fill = black_fill
+            elif hazard_background.get("risk_assessed_and_identified") is False:
+                ws.cell(row=71, column=_col_num("D")).fill = black_fill
+        except Exception:
+            pass
+        try:
+            if hazard_background.get("new_risk_assessment_needed") is True:
+                ws.cell(row=71, column=_col_num("AS")).fill = black_fill
+            elif hazard_background.get("new_risk_assessment_needed") is False:
+                ws.cell(row=71, column=_col_num("AI")).fill = black_fill
+        except Exception:
+            pass
 
-        if hazard_background["risk_assessed_and_identified"] is True:
-            ws["N71"].fill = black_fill
-        elif hazard_background["risk_assessed_and_identified"] is False:
-            ws["D71"].fill = black_fill
-
-        if hazard_background["new_risk_assessment_needed"] is True:
-            ws["AS71"].fill = black_fill
-        elif hazard_background["new_risk_assessment_needed"] is False:
-            ws["AI71"].fill = black_fill
-
-        ws["N76"].fill = black_fill  # Taller de limitaciones funcionales default NO
-
-        safety_dojo_date = hazard_background["safety_dojo_reception_date"]
-        if safety_dojo_date:
-            if isinstance(safety_dojo_date, (datetime, date)):
-                set_cell("AB76", safety_dojo_date.strftime("%d/%m/%Y"))
+        # Row 76: Taller de limitaciones funcionales (default NO) + Safety Dojo
+        try:
+            ws.cell(row=76, column=_col_num("N")).fill = black_fill  # NO
+        except Exception:
+            pass
+        safety_dojo_date = hazard_background.get("safety_dojo_reception_date")
+        try:
+            if safety_dojo_date:
+                if isinstance(safety_dojo_date, (datetime, date)):
+                    ws.cell(row=76, column=_col_num("AB")).value = safety_dojo_date.strftime("%d/%m/%Y")
+                else:
+                    ws.cell(row=76, column=_col_num("AB")).value = str(safety_dojo_date)
             else:
-                set_cell("AB76", str(safety_dojo_date))
-        else:
-            ws["AW76"].fill = black_fill
+                ws.cell(row=76, column=_col_num("AW")).fill = black_fill
+        except Exception:
+            pass
 
-        genba_dojo_date = hazard_background["genba_dojo_reception_date"]
-        if genba_dojo_date:
-            if isinstance(genba_dojo_date, (datetime, date)):
-                set_cell("AB77", genba_dojo_date.strftime("%d/%m/%Y"))
+        # Row 77: Fecha Genba Dojo
+        genba_dojo_date = hazard_background.get("genba_dojo_reception_date")
+        try:
+            if genba_dojo_date:
+                if isinstance(genba_dojo_date, (datetime, date)):
+                    ws.cell(row=77, column=_col_num("AB")).value = genba_dojo_date.strftime("%d/%m/%Y")
+                else:
+                    ws.cell(row=77, column=_col_num("AB")).value = str(genba_dojo_date)
             else:
-                set_cell("AB77", str(genba_dojo_date))
-        else:
-            ws["AW77"].fill = black_fill
+                ws.cell(row=77, column=_col_num("AW")).fill = black_fill
+        except Exception:
+            pass
 
-        negligence = hazard_background["negligence_type"]
-        if negligence == "Negligencia consciente":
-            ws["V81"].fill = black_fill
-        elif negligence == "Negligencia no consciente":
-            ws["AD81"].fill = black_fill
+        # Row 81: Tipo de negligencia + Reporte laboral
+        try:
+            negligence = hazard_background.get("negligence_type")
+            if negligence == "Negligencia consciente":
+                ws.cell(row=81, column=_col_num("V")).fill = black_fill
+            elif negligence == "Negligencia no consciente":
+                ws.cell(row=81, column=_col_num("AD")).fill = black_fill
+        except Exception:
+            pass
+        try:
+            if hazard_background.get("labor_report") is True:
+                ws.cell(row=81, column=_col_num("AW")).fill = black_fill
+            elif hazard_background.get("labor_report") is False:
+                ws.cell(row=81, column=_col_num("AN")).fill = black_fill
+        except Exception:
+            pass
 
-        if hazard_background["labor_report"] is True:
-            ws["AW81"].fill = black_fill
-        elif hazard_background["labor_report"] is False:
-            ws["AN81"].fill = black_fill
+    # Intervening factors checks (row 81) - Acto / Condición insegura
+    has_acto = any(f.get("name") and "acto" in f["name"].lower() for f in intervening_factors)
+    has_condicion = any(f.get("name") and ("condicion" in f["name"].lower() or "condición" in f["name"].lower()) for f in intervening_factors)
+    try:
+        if has_acto:
+            ws.cell(row=81, column=_col_num("D")).fill = black_fill
+        if has_condicion:
+            ws.cell(row=81, column=_col_num("L")).fill = black_fill
+    except Exception:
+        pass
 
-    # Intervening factors checks
-    has_acto = any(f["name"] and "acto" in f["name"].lower() for f in intervening_factors)
-    has_condicion = any(f["name"] and ("condicion" in f["name"].lower() or "condición" in f["name"].lower()) for f in intervening_factors)
-    if has_acto:
-        ws["D81"].fill = black_fill
-    if has_condicion:
-        ws["L81"].fill = black_fill
-
-    # Intervening factors list (max 5)
+    # Intervening factors list (filas 49-53 fijas del template)
+    # Estas filas están ANTES del árbol de factores (row 36-43) así que no se desplazan
     row_idx = 49
     for f in intervening_factors:
         if row_idx <= 53:
-            set_cell(f"D{row_idx}", f["name"] or "")
+            set_cell(f"D{row_idx}", f.get("name") or "")
             row_idx += 1
 
-    # Factor tree (max 7)
-    factor_row = 36
+    # =========================================================
+    # ÁRBOL DE FACTORES - Generación dinámica con inserción de filas
+    # Referencia visual: Reporte de incidente IMEX.xls sección 4
+    # Columnas: Lesión | División (4M) | Factor | Subtipo | Descripción
+    # Se inserta DESPUÉS de escribir los antecedentes para que openpyxl
+    # desplace automáticamente las filas ya escritas.
+    # =========================================================
+    FACTOR_TREE_START_ROW = 36
+    FACTOR_TREE_TEMPLATE_SLOTS = 8  # Filas disponibles en la plantilla (36-43)
+
+    # Si hay más factores que los slots disponibles, insertar filas adicionales
+    extra_factor_rows = max(0, len(factors) - FACTOR_TREE_TEMPLATE_SLOTS)
+    if extra_factor_rows > 0:
+        factor_insert_at = FACTOR_TREE_START_ROW + FACTOR_TREE_TEMPLATE_SLOTS
+
+        # Paso 1: Recopilar y quitar merges en o debajo del punto de inserción
+        factor_merges_to_shift = []
+        for mr in list(ws.merged_cells.ranges):
+            if mr.min_row >= factor_insert_at:
+                factor_merges_to_shift.append((
+                    mr.min_row, mr.max_row,
+                    mr.min_col, mr.max_col
+                ))
+        for mr in list(ws.merged_cells.ranges):
+            if (mr.min_row, mr.max_row, mr.min_col, mr.max_col) in factor_merges_to_shift:
+                ws.merged_cells.ranges.discard(mr)
+
+        # Paso 2: Insertar filas en blanco
+        ws.insert_rows(factor_insert_at, extra_factor_rows)
+
+        # Paso 3: Re-aplicar merges desplazados
+        for (min_r, max_r, min_c, max_c) in factor_merges_to_shift:
+            ws.merge_cells(
+                start_row=min_r + extra_factor_rows,
+                end_row=max_r + extra_factor_rows,
+                start_column=min_c,
+                end_column=max_c
+            )
+
+        # Paso 4: Copiar estilos y merges de la fila template a las nuevas filas
+        from copy import copy
+        for idx in range(extra_factor_rows):
+            r_idx = factor_insert_at + idx
+            ws.row_dimensions[r_idx].height = ws.row_dimensions[FACTOR_TREE_START_ROW].height
+            for col_idx in range(1, ws.max_column + 1):
+                src_cell = ws.cell(row=FACTOR_TREE_START_ROW, column=col_idx)
+                dest_cell = ws.cell(row=r_idx, column=col_idx)
+                if src_cell.has_style:
+                    dest_cell.font = copy(src_cell.font)
+                    dest_cell.fill = copy(src_cell.fill)
+                    dest_cell.border = copy(src_cell.border)
+                    dest_cell.alignment = copy(src_cell.alignment)
+                    dest_cell.number_format = src_cell.number_format
+                    dest_cell.protection = copy(src_cell.protection)
+
+            # Replicar merges de la fila de factores (C:G para 4M, H:K para actual, L:O para factor, P:S para subtipo/punto control, T:U para estándar, V:W para cumple norma, X:Y para cumple seguridad, Z:AG para comentarios)
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=3, end_column=7)   # C:G
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=8, end_column=11)  # H:K
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=12, end_column=15) # L:O
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=16, end_column=19) # P:S
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=20, end_column=21) # T:U
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=22, end_column=23) # V:W
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=24, end_column=25) # X:Y
+            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=26, end_column=33) # Z:AG
+
+    # Rellenar filas del Árbol de Factores
+    # Estructura visual (inspirada en IMEX):
+    #   C = Lesión/División (4M)  |  H = Situación actual
+    #   L = Factor                |  P = Punto de control (subtipo)
+    #   T = Estándar              |  V = Cumple norma
+    #   X = Cumple seguridad      |  Z = Descripción/Comentarios
+    factor_row = FACTOR_TREE_START_ROW
     for f in factors:
-        set_cell(f"C{factor_row}", f.get("4m") or f.get("m4") or "")
-        set_cell(f"H{factor_row}", f.get("actual") or "")
-        set_cell(f"L{factor_row}", f.get("factor") or "")
-        set_cell(f"P{factor_row}", f.get("control_point") or "")
-        set_cell(f"T{factor_row}", f.get("standard") or "")
-        set_cell(f"V{factor_row}", "SÍ" if f.get("met_standard") in [True, "SÍ", "SI"] else "NO")
-        set_cell(f"X{factor_row}", "SÍ" if f.get("met_safety") in [True, "SÍ", "SI"] else "NO")
-        set_cell(f"Z{factor_row}", f.get("comments") or "")
+        division = f.get("4m") or f.get("m4") or ""
+        factor_val = f.get("factor") or ""
+        subtipo = f.get("control_point") or ""
+        descripcion = f.get("comments") or ""
+        actual_val = f.get("actual") or ""
+        standard_val = f.get("standard") or ""
+        met_std = "SÍ" if f.get("met_standard") in [True, "SÍ", "SI", "true", 1] else "NO"
+        met_saf = "SÍ" if f.get("met_safety") in [True, "SÍ", "SI", "true", 1] else "NO"
+
+        # Lesión se coloca en C (columna 3) solo en el primer factor o como referencia
+        set_cell(f"C{factor_row}", division)        # División / Categoría 4M
+        set_cell(f"H{factor_row}", actual_val)      # Situación actual
+        set_cell(f"L{factor_row}", factor_val)      # Factor
+        set_cell(f"P{factor_row}", subtipo)         # Subtipo / Punto de control
+        set_cell(f"T{factor_row}", standard_val)    # Estándar
+        set_cell(f"V{factor_row}", met_std)         # Cumple norma
+        set_cell(f"X{factor_row}", met_saf)         # Cumple seguridad
+        set_cell(f"Z{factor_row}", descripcion)     # Descripción / Comentarios
         factor_row += 1
 
-    # Countermeasure Plans (starting at Row 87)
+    # Calcular desplazamiento total por filas insertadas en árbol de factores
+    factor_shift = extra_factor_rows
+
+    # Countermeasure Plans (starting at Row 87, desplazado por factor_shift)
     template_capacity = 7
-    start_row = 87
+    start_row = 87 + factor_shift
     extra_rows = len(countermeasures) - template_capacity if len(countermeasures) > template_capacity else 0
 
     if extra_rows > 0:
         insert_at = start_row + template_capacity
 
-        # --- Step 1: Collect and remove all merges at or below the insertion point ---
-        # openpyxl's insert_rows does not reliably update existing merge references,
-        # so we manually shift them to avoid corrupted/overlapping merge cells.
         merges_to_shift = []
-        merges_to_keep = []
         for mr in list(ws.merged_cells.ranges):
             if mr.min_row >= insert_at:
                 merges_to_shift.append((
                     mr.min_row, mr.max_row,
                     mr.min_col, mr.max_col
                 ))
-            else:
-                merges_to_keep.append(mr)
 
         # Remove all merge ranges that need to be shifted
         for mr in list(ws.merged_cells.ranges):
@@ -350,8 +480,8 @@ def generate_excel(id_incident: int):
         set_cell(f"AX{r_idx}", "X" if p["ng"] else "" )
         set_cell(f"AZ{r_idx}", p["comment"] or p.get("comments") or "")
 
-    # Participants
-    shift_amount = extra_rows
+    # Participants (desplazamiento por extra_rows de countermeasures + factor_shift)
+    shift_amount = extra_rows + factor_shift
     workers = [p for p in participants if p["participant_type"] == 'Participante']
     interested = [p for p in participants if p["participant_type"] == 'Parte interesada pertinente']
     reps = [p for p in participants if p["participant_type"] == 'Representante de los trabajadores']
