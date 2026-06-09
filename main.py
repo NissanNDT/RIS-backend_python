@@ -18,7 +18,11 @@ app = FastAPI(title="RIS Python Backend", version="1.0.0")
 # CORS Configuration matching Express app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://ris-frontend-peach.vercel.app",
+        "http://ris-frontend-peach.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
