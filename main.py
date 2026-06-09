@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-
+#
 # Import all routers
 from routes import (
     auth, users, areas, plants, roles, sub_areas, sv_by_area,
