@@ -56,6 +56,7 @@ app.include_router(excel.router, prefix="/api", tags=["Excel"])
 
 # Base Home Endpoint matching Express '/' route
 @app.get("/")
+@app.head("/")
 def home():
     return PlainTextResponse("API funcionando ")
 
