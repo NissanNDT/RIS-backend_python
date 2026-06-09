@@ -13,16 +13,30 @@ from routes import (
     analysis_participants, cost_centers, excel
 )
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+env_path = os.path.join(os.path.dirname(__file__), '.env.local')
+load_dotenv(env_path)
+
+# Retrieve origins from environment variables, fallback to defaults
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    origins = [
+        "http://localhost:5173",
+        "https://ris-frontend-peach.vercel.app",
+        "http://ris-frontend-peach.vercel.app"
+    ]
+
 app = FastAPI(title="RIS Python Backend", version="1.0.0")
 
 # CORS Configuration matching Express app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://ris-frontend-peach.vercel.app",
-        "http://ris-frontend-peach.vercel.app"
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

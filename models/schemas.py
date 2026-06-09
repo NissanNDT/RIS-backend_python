@@ -83,7 +83,7 @@ class FindingCreate(BaseModel):
     id_area: int
     id_plant: int
     finding_category: str
-    level: str
+    level: Optional[str] = None
     reference_to_the_standard: Optional[str] = None
     verification_date: Optional[date] = None
     corrective_action: Optional[str] = None
