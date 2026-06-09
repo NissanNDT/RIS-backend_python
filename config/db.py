@@ -21,7 +21,7 @@ db_pool = ConnectionPool(
     min_size=1,
     max_size=10,
     open=True,
-    kwargs={"row_factory": dict_row, "autocommit": True}
+    kwargs={"row_factory": dict_row, "autocommit": True, "prepare_threshold": None}
 )
 
 def get_db():
