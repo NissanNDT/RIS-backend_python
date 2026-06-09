@@ -259,17 +259,46 @@ def generate_excel(id_incident: int):
     extra_rows = len(countermeasures) - template_capacity if len(countermeasures) > template_capacity else 0
 
     if extra_rows > 0:
-        # Insert blank rows
-        ws.insert_rows(start_row + template_capacity, extra_rows)
-        # Apply styles and merges to inserted rows
+        insert_at = start_row + template_capacity
+
+        # --- Step 1: Collect and remove all merges at or below the insertion point ---
+        # openpyxl's insert_rows does not reliably update existing merge references,
+        # so we manually shift them to avoid corrupted/overlapping merge cells.
+        merges_to_shift = []
+        merges_to_keep = []
+        for mr in list(ws.merged_cells.ranges):
+            if mr.min_row >= insert_at:
+                merges_to_shift.append((
+                    mr.min_row, mr.max_row,
+                    mr.min_col, mr.max_col
+                ))
+            else:
+                merges_to_keep.append(mr)
+
+        # Remove all merge ranges that need to be shifted
+        for mr in list(ws.merged_cells.ranges):
+            if (mr.min_row, mr.max_row, mr.min_col, mr.max_col) in merges_to_shift:
+                ws.merged_cells.ranges.discard(mr)
+
+        # --- Step 2: Insert the blank rows ---
+        ws.insert_rows(insert_at, extra_rows)
+
+        # --- Step 3: Re-apply shifted merges ---
+        for (min_r, max_r, min_c, max_c) in merges_to_shift:
+            ws.merge_cells(
+                start_row=min_r + extra_rows, end_row=max_r + extra_rows,
+                start_column=min_c, end_column=max_c
+            )
+
+        # --- Step 4: Apply styles and merges to the newly inserted rows ---
         from copy import copy
         for idx in range(extra_rows):
-            r_idx = start_row + template_capacity + idx
-            
+            r_idx = insert_at + idx
+
             # Copy row height
             ws.row_dimensions[r_idx].height = ws.row_dimensions[start_row].height
-            
-            # Copy cell styles/borders
+
+            # Copy cell styles/borders from the first template countermeasure row
             for col_idx in range(1, ws.max_column + 1):
                 src_cell = ws.cell(row=start_row, column=col_idx)
                 dest_cell = ws.cell(row=r_idx, column=col_idx)
@@ -281,7 +310,7 @@ def generate_excel(id_incident: int):
                     dest_cell.number_format = src_cell.number_format
                     dest_cell.protection = copy(src_cell.protection)
 
-            # Merge cells for structure
+            # Merge cells for countermeasure row structure
             ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=3, end_column=13)
             ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=14, end_column=19)
             ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=20, end_column=23)
