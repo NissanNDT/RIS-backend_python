@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+bcrypt
+pyjwt
+python-dotenv
+psycopg[pool]
+openpyxl
+pydantic
