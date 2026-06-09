@@ -364,7 +364,7 @@ def generate_excel(id_incident: int):
 
     # Modify drawings in zip bytes
     zip_bytes = out.getvalue()
-    modified_zip_bytes = modify_excel_zip_with_drawings_py(zip_bytes, incident["injury"] or "", factors)
+    modified_zip_bytes = modify_excel_zip_with_drawings_py(zip_bytes, incident["injury"] or "", factors, template_path)
     out_modified = BytesIO(modified_zip_bytes)
 
     filename = f"reporte_{incident['incident_folio'] or id_incident}.xlsx"
@@ -374,27 +374,39 @@ def generate_excel(id_incident: int):
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-def modify_excel_zip_with_drawings_py(zip_bytes, injury_text, factors):
+def modify_excel_zip_with_drawings_py(zip_bytes, injury_text, factors, template_path):
     import zipfile
     import io
 
+    # Extract modified sheets/styles from the openpyxl zip
     in_file = io.BytesIO(zip_bytes)
-    out_file = io.BytesIO()
-
     try:
-        with zipfile.ZipFile(in_file, 'r') as yin:
-            with zipfile.ZipFile(out_file, 'w') as yout:
-                for item in yin.infolist():
-                    data = yin.read(item.filename)
-                    if item.filename == 'xl/drawings/drawing1.xml':
-                        xml_str = data.decode('utf-8')
+        with zipfile.ZipFile(in_file, 'r') as z_openpyxl:
+            sheet1_data = z_openpyxl.read('xl/worksheets/sheet1.xml')
+            styles_data = z_openpyxl.read('xl/styles.xml')
+    except Exception as e:
+        print("Error reading from openpyxl zip:", e)
+        return zip_bytes
+
+    # Rebuild using the original template zip as base to preserve all drawing files, media, and relationship files
+    out_file = io.BytesIO()
+    try:
+        with zipfile.ZipFile(template_path, 'r') as z_orig:
+            with zipfile.ZipFile(out_file, 'w', compression=zipfile.ZIP_DEFLATED) as z_out:
+                for item in z_orig.infolist():
+                    if item.filename == 'xl/worksheets/sheet1.xml':
+                        z_out.writestr(item.filename, sheet1_data)
+                    elif item.filename == 'xl/styles.xml':
+                        z_out.writestr(item.filename, styles_data)
+                    elif item.filename == 'xl/drawings/drawing1.xml':
+                        xml_str = z_orig.read(item.filename).decode('utf-8')
                         modified_xml = modify_drawing_xml_py(xml_str, injury_text, factors)
-                        yout.writestr(item.filename, modified_xml.encode('utf-8'))
+                        z_out.writestr(item.filename, modified_xml.encode('utf-8'))
                     else:
-                        yout.writestr(item, data)
+                        z_out.writestr(item.filename, z_orig.read(item.filename))
         return out_file.getvalue()
     except Exception as e:
-        print("Error modifying zip with drawings in Python:", e)
+        print("Error rebuilding zip with original template base in Python:", e)
         return zip_bytes
 
 def modify_drawing_xml_py(xml_str, injury_text, factors):
