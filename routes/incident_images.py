@@ -5,13 +5,25 @@ from models.schemas import IncidentImageCreate
 
 router = APIRouter()
 
+def clean_image_path(path: str) -> str:
+    if not path:
+        return path
+    if path.startswith("http://") or path.startswith("https://"):
+        for bucket in ["finding-images", "incident-images"]:
+            if bucket in path:
+                parts = path.split(bucket + "/")
+                if len(parts) > 1:
+                    return parts[1].split("?")[0]
+    return path
+
 @router.post("/incident-images", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_token)])
 def create_incident_image(payload: IncidentImageCreate):
     with db_pool.connection() as conn:
         with conn.cursor() as cur:
+            cleaned_path = clean_image_path(payload.incident_image_path)
             cur.execute(
                 "INSERT INTO incident_images (id_incident_format, incident_image_path) VALUES (%s, %s) RETURNING *",
-                [payload.id_incident_format, payload.incident_image_path]
+                [payload.id_incident_format, cleaned_path]
             )
             return cur.fetchone()
 

@@ -24,6 +24,17 @@ def clean_for_folio(s: str) -> str:
     s = re.sub(r'-+', '-', s)
     return s
 
+def clean_image_path(path: str) -> str:
+    if not path:
+        return path
+    if path.startswith("http://") or path.startswith("https://"):
+        for bucket in ["finding-images", "incident-images"]:
+            if bucket in path:
+                parts = path.split(bucket + "/")
+                if len(parts) > 1:
+                    return parts[1].split("?")[0]
+    return path
+
 @router.get("/get/findings")
 def get_findings():
     with db_pool.connection() as conn:
@@ -98,8 +109,10 @@ def create_finding(payload: FindingCreate, request: Request, user: dict = Depend
                             count += 1
 
                 # Empty strings to None
-                f_img = None if payload.finding_image_path == "" else payload.finding_image_path
-                c_img = None if payload.countermeasure_image_path == "" else payload.countermeasure_image_path
+                f_img = clean_image_path(payload.finding_image_path)
+                f_img = None if f_img == "" else f_img
+                c_img = clean_image_path(payload.countermeasure_image_path)
+                c_img = None if c_img == "" else c_img
 
                 # Insert finding
                 cur.execute(
@@ -187,11 +200,13 @@ def update_finding(id: int, payload: FindingUpdate):
 
                 f_img = finding["finding_image_path"]
                 if payload.finding_image_path is not None:
-                    f_img = None if payload.finding_image_path == "" else payload.finding_image_path
+                    cleaned_f = clean_image_path(payload.finding_image_path)
+                    f_img = None if cleaned_f == "" else cleaned_f
 
                 c_img = finding["countermeasure_image_path"]
                 if payload.countermeasure_image_path is not None:
-                    c_img = None if payload.countermeasure_image_path == "" else payload.countermeasure_image_path
+                    cleaned_c = clean_image_path(payload.countermeasure_image_path)
+                    c_img = None if cleaned_c == "" else cleaned_c
 
                 cur.execute(
                     """UPDATE finding SET
