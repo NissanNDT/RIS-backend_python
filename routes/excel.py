@@ -195,7 +195,7 @@ def generate_excel(id_incident: int):
         try:
             if hazard_background.get("horizontal_review") is True:
                 ws.cell(row=61, column=_col_num("AJ")).fill = black_fill
-                ws.cell(row=61, column=_col_num("AT")).value = hazard_background.get("horizontal_review_comment") or ""
+                ws.cell(row=62, column=_col_num("AT")).value = hazard_background.get("horizontal_review_comment") or ""
             elif hazard_background.get("horizontal_review") is False:
                 ws.cell(row=61, column=_col_num("AO")).fill = black_fill
         except Exception:
@@ -205,7 +205,7 @@ def generate_excel(id_incident: int):
         try:
             if hazard_background.get("existing_processes_or_areas_potential_for_incident") is True:
                 ws.cell(row=66, column=_col_num("N")).fill = black_fill
-                ws.cell(row=66, column=_col_num("W")).value = hazard_background.get("processes_or_areas_potential_for_incident") or ""
+                ws.cell(row=66, column=_col_num("AJ")).value = hazard_background.get("processes_or_areas_potential_for_incident") or ""
             elif hazard_background.get("existing_processes_or_areas_potential_for_incident") is False:
                 ws.cell(row=66, column=_col_num("D")).fill = black_fill
         except Exception:
@@ -300,13 +300,43 @@ def generate_excel(id_incident: int):
     # Se inserta DESPUÉS de escribir los antecedentes para que openpyxl
     # desplace automáticamente las filas ya escritas.
     # =========================================================
-    FACTOR_TREE_START_ROW = 36
-    FACTOR_TREE_TEMPLATE_SLOTS = 8  # Filas disponibles en la plantilla (36-43)
+    # Group factors by category (4M)
+    categories = [
+        {"name": "Mano de Obra", "match": ["mano de obra", "mano"], "factors": []},
+        {"name": "Método", "match": ["metodo", "método"], "factors": []},
+        {"name": "Maquinaria", "match": ["maquinaria", "máquinaria"], "factors": []},
+        {"name": "Materiales", "match": ["material", "materiales"], "factors": []}
+    ]
 
-    # Si hay más factores que los slots disponibles, insertar filas adicionales
-    extra_factor_rows = max(0, len(factors) - FACTOR_TREE_TEMPLATE_SLOTS)
+    for f in factors:
+        f_4m = str(f.get("4m") or f.get("m4") or f.get("m4_name") or "").lower().strip()
+        matched = False
+        for cat in categories:
+            if any(m in f_4m for m in cat["match"]):
+                cat["factors"].append(f)
+                matched = True
+                break
+        if not matched:
+            categories[0]["factors"].append(f) # fallback
+
+    for cat in categories:
+        if not cat["factors"]:
+            cat["factors"].append({
+                "factor": "",
+                "control_point": "",
+                "standard": "",
+                "actual": "",
+                "met_standard": None,
+                "met_safety": None,
+                "comments": ""
+            })
+
+    total_factors_count = sum(len(cat["factors"]) for cat in categories)
+    
+    # Cada factor ocupa 2 filas. El template tiene capacidad para 8 filas de factor (4 categorías x 2 filas = 8 filas).
+    extra_factor_rows = max(0, 2 * total_factors_count - 8)
     if extra_factor_rows > 0:
-        factor_insert_at = FACTOR_TREE_START_ROW + FACTOR_TREE_TEMPLATE_SLOTS
+        factor_insert_at = 48 # En el template original, la fila 48 es "5. FACTORES QUE INTERVIENEN"
 
         # Paso 1: Recopilar y quitar merges en o debajo del punto de inserción
         factor_merges_to_shift = []
@@ -332,13 +362,13 @@ def generate_excel(id_incident: int):
                 end_column=max_c
             )
 
-        # Paso 4: Copiar estilos y merges de la fila template a las nuevas filas
+        # Paso 4: Copiar estilos de la última fila de factores (fila 47 en template original)
         from copy import copy
         for idx in range(extra_factor_rows):
             r_idx = factor_insert_at + idx
-            ws.row_dimensions[r_idx].height = ws.row_dimensions[FACTOR_TREE_START_ROW].height
+            ws.row_dimensions[r_idx].height = ws.row_dimensions[47].height
             for col_idx in range(1, ws.max_column + 1):
-                src_cell = ws.cell(row=FACTOR_TREE_START_ROW, column=col_idx)
+                src_cell = ws.cell(row=47, column=col_idx)
                 dest_cell = ws.cell(row=r_idx, column=col_idx)
                 if src_cell.has_style:
                     dest_cell.font = copy(src_cell.font)
@@ -348,43 +378,43 @@ def generate_excel(id_incident: int):
                     dest_cell.number_format = src_cell.number_format
                     dest_cell.protection = copy(src_cell.protection)
 
-            # Replicar merges de la fila de factores (C:G para 4M, H:K para actual, L:O para factor, P:S para subtipo/punto control, T:U para estándar, V:W para cumple norma, X:Y para cumple seguridad, Z:AG para comentarios)
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=3, end_column=7)   # C:G
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=8, end_column=11)  # H:K
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=12, end_column=15) # L:O
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=16, end_column=19) # P:S
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=20, end_column=21) # T:U
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=22, end_column=23) # V:W
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=24, end_column=25) # X:Y
-            ws.merge_cells(start_row=r_idx, end_row=r_idx, start_column=26, end_column=33) # Z:AG
-
     # Rellenar filas del Árbol de Factores
-    # Estructura visual (inspirada en IMEX):
-    #   C = Lesión/División (4M)  |  H = Situación actual
-    #   L = Factor                |  P = Punto de control (subtipo)
-    #   T = Estándar              |  V = Cumple norma
-    #   X = Cumple seguridad      |  Z = Descripción/Comentarios
-    factor_row = FACTOR_TREE_START_ROW
-    for f in factors:
-        division = f.get("4m") or f.get("m4") or ""
-        factor_val = f.get("factor") or ""
-        subtipo = f.get("control_point") or ""
-        descripcion = f.get("comments") or ""
-        actual_val = f.get("actual") or ""
-        standard_val = f.get("standard") or ""
-        met_std = "SÍ" if f.get("met_standard") in [True, "SÍ", "SI", "true", 1] else "NO"
-        met_saf = "SÍ" if f.get("met_safety") in [True, "SÍ", "SI", "true", 1] else "NO"
+    current_factor_idx = 0
+    for cat in categories:
+        for j, f in enumerate(cat["factors"]):
+            factor_offset = 2 * current_factor_idx
+            r_idx = 40 + factor_offset
+            
+            division = cat["name"] if j == 0 else ""
+            factor_val = f.get("factor") or ""
+            subtipo = f.get("control_point") or ""
+            descripcion = f.get("comments") or ""
+            actual_val = f.get("actual") or ""
+            standard_val = f.get("standard") or ""
+            met_std = "SÍ" if f.get("met_standard") in [True, "SÍ", "SI", "true", 1] else ("NO" if f.get("met_standard") in [False, "NO", "false", 0] else "")
+            met_saf = "SÍ" if f.get("met_safety") in [True, "SÍ", "SI", "true", 1] else ("NO" if f.get("met_safety") in [False, "NO", "false", 0] else "")
 
-        # Lesión se coloca en C (columna 3) solo en el primer factor o como referencia
-        set_cell(f"C{factor_row}", division)        # División / Categoría 4M
-        set_cell(f"H{factor_row}", actual_val)      # Situación actual
-        set_cell(f"L{factor_row}", factor_val)      # Factor
-        set_cell(f"P{factor_row}", subtipo)         # Subtipo / Punto de control
-        set_cell(f"T{factor_row}", standard_val)    # Estándar
-        set_cell(f"V{factor_row}", met_std)         # Cumple norma
-        set_cell(f"X{factor_row}", met_saf)         # Cumple seguridad
-        set_cell(f"Z{factor_row}", descripcion)     # Descripción / Comentarios
-        factor_row += 1
+            # Escribir en celdas
+            set_cell(f"C{r_idx}", division)        # División / Categoría 4M
+            set_cell(f"H{r_idx}", actual_val)      # Situación actual
+            set_cell(f"L{r_idx}", factor_val)      # Factor
+            set_cell(f"P{r_idx}", subtipo)         # Subtipo / Punto de control
+            set_cell(f"T{r_idx}", standard_val)    # Estándar
+            set_cell(f"V{r_idx}", met_std)         # Cumple norma
+            set_cell(f"X{r_idx}", met_saf)         # Cumple seguridad
+            set_cell(f"Z{r_idx}", descripcion)     # Descripción / Comentarios
+
+            # Combinar celdas de forma vertical (2 filas por factor)
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=3, end_column=7)   # C:G
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=8, end_column=11)  # H:K
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=12, end_column=15) # L:O
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=16, end_column=19) # P:S
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=20, end_column=21) # T:U
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=22, end_column=23) # V:W
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=24, end_column=25) # X:Y
+            ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=26, end_column=33) # Z:AG
+            
+            current_factor_idx += 1
 
     # Calcular desplazamiento total por filas insertadas en árbol de factores
     factor_shift = extra_factor_rows
@@ -578,89 +608,127 @@ def modify_drawing_xml_py(xml_str, injury_text, factors):
         
     new_anchors = anchors[:11]
     
+    # Group factors by category
+    categories = [
+        {"name": "Mano de Obra", "match": ["mano de obra", "mano"], "factors": []},
+        {"name": "Método", "match": ["metodo", "método"], "factors": []},
+        {"name": "Maquinaria", "match": ["maquinaria", "máquinaria"], "factors": []},
+        {"name": "Materiales", "match": ["material", "materiales"], "factors": []}
+    ]
+
+    for f in factors:
+        f_4m = str(f.get("4m") or f.get("m4") or f.get("m4_name") or "").lower().strip()
+        matched = False
+        for cat in categories:
+            if any(m in f_4m for m in cat["match"]):
+                cat["factors"].append(f)
+                matched = True
+                break
+        if not matched:
+            categories[0]["factors"].append(f) # fallback
+            
+    for cat in categories:
+        if not cat["factors"]:
+            cat["factors"].append({
+                "factor": "",
+                "control_point": "",
+                "standard": "",
+                "actual": "",
+                "met_standard": None,
+                "met_safety": None,
+                "comments": ""
+            })
+            
+    total_factors_count = sum(len(cat["factors"]) for cat in categories)
+    total_offset = 2 * total_factors_count
+    
+    # Adjust Lesión anchor ending row
     lesion_anchor = anchors[11]
     lesion_anchor = set_shape_text_py(lesion_anchor, injury_text)
+    
+    row_tags = re.findall(r'<xdr:row>\d+</xdr:row>', lesion_anchor)
+    if len(row_tags) >= 2:
+        new_row_tag = f"<xdr:row>{39 + total_offset - 2}</xdr:row>"
+        parts = re.split(r'(<xdr:row>\d+</xdr:row>)', lesion_anchor)
+        count = 0
+        for idx_p, part in enumerate(parts):
+            if re.match(r'<xdr:row>\d+</xdr:row>', part):
+                count += 1
+                if count == 2:
+                    parts[idx_p] = new_row_tag
+                    break
+        lesion_anchor = "".join(parts)
+        
     new_anchors.append(lesion_anchor)
     
     template_shapes = {}
     for idx in range(12, 20):
         template_shapes[idx] = anchors[idx]
         
-    categories = [
-        {"name": "Mano de Obra", "match": ["mano de obra", "mano"], "offset": 0},
-        {"name": "Método", "match": ["metodo", "método"], "offset": 2},
-        {"name": "Maquinaria", "match": ["maquinaria", "máquinaria"], "offset": 4},
-        {"name": "Materiales", "match": ["material", "materiales"], "offset": 6}
-    ]
-    
     next_id = 100
+    current_factor_idx = 0
+    
     for cat in categories:
-        factor = None
-        for f in factors:
-            f_4m = str(f.get("4m") or f.get("m4") or "").lower().strip()
-            if any(m in f_4m for m in cat["match"]):
-                factor = f
-                break
+        for j, factor in enumerate(cat["factors"]):
+            offset = 2 * current_factor_idx
+            
+            # Only output category shape for the first factor of each category
+            if j == 0:
+                cat_shape = template_shapes[12]
+                cat_shape = shift_anchor_row_py(cat_shape, offset)
+                cat_shape = set_shape_text_py(cat_shape, cat["name"])
+                cat_shape = set_shape_id_py(cat_shape, next_id)
+                next_id += 1
+                new_anchors.append(cat_shape)
                 
-        offset = cat["offset"]
-        
-        # Cat Shape
-        cat_shape = template_shapes[12]
-        cat_shape = shift_anchor_row_py(cat_shape, offset)
-        cat_shape = set_shape_text_py(cat_shape, cat["name"])
-        cat_shape = set_shape_id_py(cat_shape, next_id)
-        next_id += 1
-        new_anchors.append(cat_shape)
-        
-        # Details
-        f_text = factor.get("factor") if factor else ""
-        cp_text = factor.get("control_point") if factor else ""
-        std_text = factor.get("standard") if factor else ""
-        act_text = factor.get("actual") if factor else ""
-        comm_text = factor.get("comments") if factor else ""
-        
-        # Factor
-        s_factor = template_shapes[13]
-        s_factor = shift_anchor_row_py(s_factor, offset)
-        s_factor = set_shape_text_py(s_factor, f_text)
-        s_factor = set_shape_id_py(s_factor, next_id)
-        next_id += 1
-        new_anchors.append(s_factor)
-        
-        # CP
-        s_cp = template_shapes[14]
-        s_cp = shift_anchor_row_py(s_cp, offset)
-        s_cp = set_shape_text_py(s_cp, cp_text)
-        s_cp = set_shape_id_py(s_cp, next_id)
-        next_id += 1
-        new_anchors.append(s_cp)
-        
-        # Std
-        s_std = template_shapes[15]
-        s_std = shift_anchor_row_py(s_std, offset)
-        s_std = set_shape_text_py(s_std, std_text)
-        s_std = set_shape_id_py(s_std, next_id)
-        next_id += 1
-        new_anchors.append(s_std)
-        
-        # Act
-        s_act = template_shapes[16]
-        s_act = shift_anchor_row_py(s_act, offset)
-        s_act = set_shape_text_py(s_act, act_text)
-        s_act = set_shape_id_py(s_act, next_id)
-        next_id += 1
-        new_anchors.append(s_act)
-        
-        # Comments
-        s_comm = template_shapes[19]
-        s_comm = shift_anchor_row_py(s_comm, offset)
-        s_comm = set_shape_text_py(s_comm, comm_text)
-        s_comm = set_shape_id_py(s_comm, next_id)
-        next_id += 1
-        new_anchors.append(s_comm)
-        
-        # Judgment
-        if factor:
+            # Details
+            f_text = factor.get("factor") or ""
+            cp_text = factor.get("control_point") or ""
+            std_text = factor.get("standard") or ""
+            act_text = factor.get("actual") or ""
+            comm_text = factor.get("comments") or ""
+            
+            # Factor
+            s_factor = template_shapes[13]
+            s_factor = shift_anchor_row_py(s_factor, offset)
+            s_factor = set_shape_text_py(s_factor, f_text)
+            s_factor = set_shape_id_py(s_factor, next_id)
+            next_id += 1
+            new_anchors.append(s_factor)
+            
+            # CP
+            s_cp = template_shapes[14]
+            s_cp = shift_anchor_row_py(s_cp, offset)
+            s_cp = set_shape_text_py(s_cp, cp_text)
+            s_cp = set_shape_id_py(s_cp, next_id)
+            next_id += 1
+            new_anchors.append(s_cp)
+            
+            # Std
+            s_std = template_shapes[15]
+            s_std = shift_anchor_row_py(s_std, offset)
+            s_std = set_shape_text_py(s_std, std_text)
+            s_std = set_shape_id_py(s_std, next_id)
+            next_id += 1
+            new_anchors.append(s_std)
+            
+            # Act
+            s_act = template_shapes[16]
+            s_act = shift_anchor_row_py(s_act, offset)
+            s_act = set_shape_text_py(s_act, act_text)
+            s_act = set_shape_id_py(s_act, next_id)
+            next_id += 1
+            new_anchors.append(s_act)
+            
+            # Comments
+            s_comm = template_shapes[19]
+            s_comm = shift_anchor_row_py(s_comm, offset)
+            s_comm = set_shape_text_py(s_comm, comm_text)
+            s_comm = set_shape_id_py(s_comm, next_id)
+            next_id += 1
+            new_anchors.append(s_comm)
+            
+            # Judgment
             met_std = factor.get("met_standard") in [True, "SÍ", "SI", "true", 1]
             met_saf = factor.get("met_safety") in [True, "SÍ", "SI", "true", 1]
             
@@ -671,6 +739,8 @@ def modify_drawing_xml_py(xml_str, injury_text, factors):
             safety_shape = make_judgment_shape_py(template_shapes, met_saf, offset, 43, next_id)
             next_id += 1
             new_anchors.append(safety_shape)
+            
+            current_factor_idx += 1
             
     header_idx = xml_str.find("<xdr:twoCellAnchor")
     xml_header = xml_str[:header_idx] if header_idx != -1 else ""

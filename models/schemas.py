@@ -89,7 +89,7 @@ class FindingCreate(BaseModel):
     corrective_action: Optional[str] = None
     id_audit: Optional[int] = None
     conclusion_date: Optional[date] = None
-    finding_type: str
+    finding_type: Optional[str] = None
     finding_image_path: Optional[str] = None
     countermeasure_image_path: Optional[str] = None
 
