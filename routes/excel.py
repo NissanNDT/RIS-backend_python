@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse, StreamingResponse
 from io import BytesIO
 import openpyxl
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from config.db import db_pool
 
 router = APIRouter()
@@ -187,49 +187,49 @@ def generate_excel(id_incident: int):
         # Row 61: ¿Se han presentado incidentes FR1 previos? + Revisión horizontal
         try:
             if hazard_background.get("previous_fr1_incidents_presented") is True:
-                ws.cell(row=61, column=_col_num("N")).fill = black_fill
+                ws.cell(row=61, column=_col_num("R")).fill = black_fill  # Checkbox SI (Col 18)
             elif hazard_background.get("previous_fr1_incidents_presented") is False:
-                ws.cell(row=61, column=_col_num("D")).fill = black_fill
+                ws.cell(row=61, column=_col_num("H")).fill = black_fill  # Checkbox NO (Col 8)
         except Exception:
             pass
         try:
             if hazard_background.get("horizontal_review") is True:
-                ws.cell(row=61, column=_col_num("AJ")).fill = black_fill
+                ws.cell(row=61, column=_col_num("AL")).fill = black_fill # Checkbox SI (Col 38)
                 ws.cell(row=62, column=_col_num("AT")).value = hazard_background.get("horizontal_review_comment") or ""
             elif hazard_background.get("horizontal_review") is False:
-                ws.cell(row=61, column=_col_num("AO")).fill = black_fill
+                ws.cell(row=61, column=_col_num("AQ")).fill = black_fill # Checkbox NO (Col 43)
         except Exception:
             pass
 
         # Row 66: ¿Existen procesos/áreas con potencial de incidente?
         try:
             if hazard_background.get("existing_processes_or_areas_potential_for_incident") is True:
-                ws.cell(row=66, column=_col_num("N")).fill = black_fill
+                ws.cell(row=66, column=_col_num("R")).fill = black_fill  # Checkbox SI (Col 18)
                 ws.cell(row=66, column=_col_num("AJ")).value = hazard_background.get("processes_or_areas_potential_for_incident") or ""
             elif hazard_background.get("existing_processes_or_areas_potential_for_incident") is False:
-                ws.cell(row=66, column=_col_num("D")).fill = black_fill
+                ws.cell(row=66, column=_col_num("H")).fill = black_fill  # Checkbox NO (Col 8)
         except Exception:
             pass
 
         # Row 71: Riesgo identificado / nueva evaluación necesaria
         try:
             if hazard_background.get("risk_assessed_and_identified") is True:
-                ws.cell(row=71, column=_col_num("N")).fill = black_fill
+                ws.cell(row=71, column=_col_num("R")).fill = black_fill  # Checkbox SI (Col 18)
             elif hazard_background.get("risk_assessed_and_identified") is False:
-                ws.cell(row=71, column=_col_num("D")).fill = black_fill
+                ws.cell(row=71, column=_col_num("H")).fill = black_fill  # Checkbox NO (Col 8)
         except Exception:
             pass
         try:
             if hazard_background.get("new_risk_assessment_needed") is True:
-                ws.cell(row=71, column=_col_num("AS")).fill = black_fill
+                ws.cell(row=71, column=_col_num("AW")).fill = black_fill # Checkbox SI (Col 49)
             elif hazard_background.get("new_risk_assessment_needed") is False:
-                ws.cell(row=71, column=_col_num("AI")).fill = black_fill
+                ws.cell(row=71, column=_col_num("AM")).fill = black_fill # Checkbox NO (Col 39)
         except Exception:
             pass
 
         # Row 76: Taller de limitaciones funcionales (default NO) + Safety Dojo
         try:
-            ws.cell(row=76, column=_col_num("N")).fill = black_fill  # NO
+            ws.cell(row=76, column=_col_num("R")).fill = black_fill  # Checkbox NO (Col 18)
         except Exception:
             pass
         safety_dojo_date = hazard_background.get("safety_dojo_reception_date")
@@ -240,7 +240,7 @@ def generate_excel(id_incident: int):
                 else:
                     ws.cell(row=76, column=_col_num("AB")).value = str(safety_dojo_date)
             else:
-                ws.cell(row=76, column=_col_num("AW")).fill = black_fill
+                ws.cell(row=76, column=_col_num("BA")).fill = black_fill # Checkbox NO (Col 53)
         except Exception:
             pass
 
@@ -253,7 +253,7 @@ def generate_excel(id_incident: int):
                 else:
                     ws.cell(row=77, column=_col_num("AB")).value = str(genba_dojo_date)
             else:
-                ws.cell(row=77, column=_col_num("AW")).fill = black_fill
+                ws.cell(row=77, column=_col_num("BA")).fill = black_fill # Checkbox NO (Col 53)
         except Exception:
             pass
 
@@ -261,16 +261,16 @@ def generate_excel(id_incident: int):
         try:
             negligence = hazard_background.get("negligence_type")
             if negligence == "Negligencia consciente":
-                ws.cell(row=81, column=_col_num("V")).fill = black_fill
+                ws.cell(row=81, column=_col_num("Z")).fill = black_fill  # Checkbox Consciente (Col 26)
             elif negligence == "Negligencia no consciente":
-                ws.cell(row=81, column=_col_num("AD")).fill = black_fill
+                ws.cell(row=81, column=_col_num("AH")).fill = black_fill # Checkbox No Consciente (Col 34)
         except Exception:
             pass
         try:
             if hazard_background.get("labor_report") is True:
-                ws.cell(row=81, column=_col_num("AW")).fill = black_fill
+                ws.cell(row=81, column=_col_num("BA")).fill = black_fill # Checkbox SI (Col 53)
             elif hazard_background.get("labor_report") is False:
-                ws.cell(row=81, column=_col_num("AN")).fill = black_fill
+                ws.cell(row=81, column=_col_num("AR")).fill = black_fill # Checkbox NO (Col 44)
         except Exception:
             pass
 
@@ -279,9 +279,9 @@ def generate_excel(id_incident: int):
     has_condicion = any(f.get("name") and ("condicion" in f["name"].lower() or "condición" in f["name"].lower()) for f in intervening_factors)
     try:
         if has_acto:
-            ws.cell(row=81, column=_col_num("D")).fill = black_fill
+            ws.cell(row=81, column=_col_num("H")).fill = black_fill  # Checkbox Acto (Col 8)
         if has_condicion:
-            ws.cell(row=81, column=_col_num("L")).fill = black_fill
+            ws.cell(row=81, column=_col_num("P")).fill = black_fill  # Checkbox Condición (Col 16)
     except Exception:
         pass
 
@@ -309,7 +309,7 @@ def generate_excel(id_incident: int):
     ]
 
     for f in factors:
-        f_4m = str(f.get("4m") or f.get("m4") or f.get("m4_name") or "").lower().strip()
+        f_4m = str(f.get("4m") or f.get("m4") or f.get("m4_name") or f.get("m4_name_es") or "").lower().strip()
         matched = False
         for cat in categories:
             if any(m in f_4m for m in cat["match"]):
@@ -330,6 +330,37 @@ def generate_excel(id_incident: int):
                 "met_safety": None,
                 "comments": ""
             })
+
+    # Escribir y dar estilo a las cabeceras en las filas 38-39 para que se visualice como tabla
+    headers_config = [
+        {"col_start": 3, "col_end": 7, "text": "DIVISIÓN (4M)"},
+        {"col_start": 8, "col_end": 11, "text": "SITUACIÓN ACTUAL"},
+        {"col_start": 12, "col_end": 15, "text": "FACTOR"},
+        {"col_start": 16, "col_end": 19, "text": "PUNTO DE CONTROL"},
+        {"col_start": 20, "col_end": 21, "text": "ESTÁNDAR"},
+        {"col_start": 22, "col_end": 23, "text": "CUMPLE NORMA"},
+        {"col_start": 24, "col_end": 25, "text": "CUMPLE SEGURIDAD"},
+        {"col_start": 26, "col_end": 33, "text": "COMENTARIOS"}
+    ]
+    
+    header_font = Font(name="Arial", size=9, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid") # Azul oscuro corporativo
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border_side = Side(border_style="thin", color="000000")
+    header_border = Border(left=border_side, right=border_side, top=border_side, bottom=border_side)
+    
+    for h in headers_config:
+        # Fusión de filas 38 y 39
+        ws.merge_cells(start_row=38, end_row=39, start_column=h["col_start"], end_column=h["col_end"])
+        for r in [38, 39]:
+            for c in range(h["col_start"], h["col_end"] + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.fill = header_fill
+                cell.border = header_border
+                cell.alignment = header_align
+                if r == 38 and c == h["col_start"]:
+                    cell.value = h["text"]
+                    cell.font = header_font
 
     total_factors_count = sum(len(cat["factors"]) for cat in categories)
     
@@ -378,6 +409,14 @@ def generate_excel(id_incident: int):
                     dest_cell.number_format = src_cell.number_format
                     dest_cell.protection = copy(src_cell.protection)
 
+    # Estilos para celdas de datos
+    data_border = Border(
+        left=Side(style='thin', color='D3D3D3'),
+        right=Side(style='thin', color='D3D3D3'),
+        top=Side(style='thin', color='D3D3D3'),
+        bottom=Side(style='thin', color='D3D3D3')
+    )
+
     # Rellenar filas del Árbol de Factores
     current_factor_idx = 0
     for cat in categories:
@@ -403,6 +442,14 @@ def generate_excel(id_incident: int):
             set_cell(f"V{r_idx}", met_std)         # Cumple norma
             set_cell(f"X{r_idx}", met_saf)         # Cumple seguridad
             set_cell(f"Z{r_idx}", descripcion)     # Descripción / Comentarios
+
+            # Aplicar bordes, alineación y fuente para toda la fila de datos
+            for r in [r_idx, r_idx+1]:
+                for c in range(3, 34):
+                    cell = ws.cell(row=r, column=c)
+                    cell.border = data_border
+                    cell.alignment = Alignment(horizontal="center" if c in [3, 22, 23, 24, 25] else "left", vertical="center", wrap_text=True)
+                    cell.font = Font(name="Arial", size=9)
 
             # Combinar celdas de forma vertical (2 filas por factor)
             ws.merge_cells(start_row=r_idx, end_row=r_idx+1, start_column=3, end_column=7)   # C:G
@@ -603,145 +650,13 @@ def modify_drawing_xml_py(xml_str, injury_text, factors):
     # Extract all twoCellAnchor tags
     anchors = re.findall(r'<xdr:twoCellAnchor[\s\S]*?</xdr:twoCellAnchor>', xml_str)
     
-    if len(anchors) < 20:
+    if len(anchors) < 3:
         return xml_str
         
-    new_anchors = anchors[:11]
+    # We only keep the top header logos/texts (anchors 0, 1, 2)
+    # The factor tree shapes/diagram are completely discarded from the drawing layer
+    new_anchors = anchors[:3]
     
-    # Group factors by category
-    categories = [
-        {"name": "Mano de Obra", "match": ["mano de obra", "mano"], "factors": []},
-        {"name": "Método", "match": ["metodo", "método"], "factors": []},
-        {"name": "Maquinaria", "match": ["maquinaria", "máquinaria"], "factors": []},
-        {"name": "Materiales", "match": ["material", "materiales"], "factors": []}
-    ]
-
-    for f in factors:
-        f_4m = str(f.get("4m") or f.get("m4") or f.get("m4_name") or "").lower().strip()
-        matched = False
-        for cat in categories:
-            if any(m in f_4m for m in cat["match"]):
-                cat["factors"].append(f)
-                matched = True
-                break
-        if not matched:
-            categories[0]["factors"].append(f) # fallback
-            
-    for cat in categories:
-        if not cat["factors"]:
-            cat["factors"].append({
-                "factor": "",
-                "control_point": "",
-                "standard": "",
-                "actual": "",
-                "met_standard": None,
-                "met_safety": None,
-                "comments": ""
-            })
-            
-    total_factors_count = sum(len(cat["factors"]) for cat in categories)
-    total_offset = 2 * total_factors_count
-    
-    # Adjust Lesión anchor ending row
-    lesion_anchor = anchors[11]
-    lesion_anchor = set_shape_text_py(lesion_anchor, injury_text)
-    
-    row_tags = re.findall(r'<xdr:row>\d+</xdr:row>', lesion_anchor)
-    if len(row_tags) >= 2:
-        new_row_tag = f"<xdr:row>{39 + total_offset - 2}</xdr:row>"
-        parts = re.split(r'(<xdr:row>\d+</xdr:row>)', lesion_anchor)
-        count = 0
-        for idx_p, part in enumerate(parts):
-            if re.match(r'<xdr:row>\d+</xdr:row>', part):
-                count += 1
-                if count == 2:
-                    parts[idx_p] = new_row_tag
-                    break
-        lesion_anchor = "".join(parts)
-        
-    new_anchors.append(lesion_anchor)
-    
-    template_shapes = {}
-    for idx in range(12, 20):
-        template_shapes[idx] = anchors[idx]
-        
-    next_id = 100
-    current_factor_idx = 0
-    
-    for cat in categories:
-        for j, factor in enumerate(cat["factors"]):
-            offset = 2 * current_factor_idx
-            
-            # Only output category shape for the first factor of each category
-            if j == 0:
-                cat_shape = template_shapes[12]
-                cat_shape = shift_anchor_row_py(cat_shape, offset)
-                cat_shape = set_shape_text_py(cat_shape, cat["name"])
-                cat_shape = set_shape_id_py(cat_shape, next_id)
-                next_id += 1
-                new_anchors.append(cat_shape)
-                
-            # Details
-            f_text = factor.get("factor") or ""
-            cp_text = factor.get("control_point") or ""
-            std_text = factor.get("standard") or ""
-            act_text = factor.get("actual") or ""
-            comm_text = factor.get("comments") or ""
-            
-            # Factor
-            s_factor = template_shapes[13]
-            s_factor = shift_anchor_row_py(s_factor, offset)
-            s_factor = set_shape_text_py(s_factor, f_text)
-            s_factor = set_shape_id_py(s_factor, next_id)
-            next_id += 1
-            new_anchors.append(s_factor)
-            
-            # CP
-            s_cp = template_shapes[14]
-            s_cp = shift_anchor_row_py(s_cp, offset)
-            s_cp = set_shape_text_py(s_cp, cp_text)
-            s_cp = set_shape_id_py(s_cp, next_id)
-            next_id += 1
-            new_anchors.append(s_cp)
-            
-            # Std
-            s_std = template_shapes[15]
-            s_std = shift_anchor_row_py(s_std, offset)
-            s_std = set_shape_text_py(s_std, std_text)
-            s_std = set_shape_id_py(s_std, next_id)
-            next_id += 1
-            new_anchors.append(s_std)
-            
-            # Act
-            s_act = template_shapes[16]
-            s_act = shift_anchor_row_py(s_act, offset)
-            s_act = set_shape_text_py(s_act, act_text)
-            s_act = set_shape_id_py(s_act, next_id)
-            next_id += 1
-            new_anchors.append(s_act)
-            
-            # Comments
-            s_comm = template_shapes[19]
-            s_comm = shift_anchor_row_py(s_comm, offset)
-            s_comm = set_shape_text_py(s_comm, comm_text)
-            s_comm = set_shape_id_py(s_comm, next_id)
-            next_id += 1
-            new_anchors.append(s_comm)
-            
-            # Judgment
-            met_std = factor.get("met_standard") in [True, "SÍ", "SI", "true", 1]
-            met_saf = factor.get("met_safety") in [True, "SÍ", "SI", "true", 1]
-            
-            norma_shape = make_judgment_shape_py(template_shapes, met_std, offset, 40, next_id)
-            next_id += 1
-            new_anchors.append(norma_shape)
-            
-            safety_shape = make_judgment_shape_py(template_shapes, met_saf, offset, 43, next_id)
-            next_id += 1
-            new_anchors.append(safety_shape)
-            
-            current_factor_idx += 1
-            
     header_idx = xml_str.find("<xdr:twoCellAnchor")
     xml_header = xml_str[:header_idx] if header_idx != -1 else ""
     footer_idx = xml_str.rfind("</xdr:twoCellAnchor>")
