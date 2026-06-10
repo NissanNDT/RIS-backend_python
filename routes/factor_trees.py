@@ -34,9 +34,9 @@ def create_factor_tree(payload: FactorTreeCreate):
     with db_pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """INSERT INTO factor_tree (id_incident_format, unsafe_act, unsafe_condition, personal_factor, work_factor, root_cause)
-                   VALUES (%s, %s, %s, %s, %s, %s) RETURNING *""",
-                [payload.id_incident_format, payload.unsafe_act, payload.unsafe_condition, payload.personal_factor, payload.work_factor, payload.root_cause]
+                """INSERT INTO factor_tree (id_incident_format, "4m", actual, factor, control_point, standard, met_standard, met_safety, comments)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *""",
+                [payload.id_incident_format, payload.m4, payload.actual, payload.factor, payload.control_point, payload.standard, payload.met_standard, payload.met_safety, payload.comments]
             )
             return cur.fetchone()
 
@@ -49,16 +49,19 @@ def update_factor_tree(id: int, payload: FactorTreeUpdate):
             if not current:
                 raise HTTPException(status_code=404, detail="Factor tree no encontrado")
                 
-            unsafe_act = payload.unsafe_act if payload.unsafe_act is not None else current["unsafe_act"]
-            unsafe_condition = payload.unsafe_condition if payload.unsafe_condition is not None else current["unsafe_condition"]
-            personal_factor = payload.personal_factor if payload.personal_factor is not None else current["personal_factor"]
-            work_factor = payload.work_factor if payload.work_factor is not None else current["work_factor"]
-            root_cause = payload.root_cause if payload.root_cause is not None else current["root_cause"]
+            m4 = payload.m4 if payload.m4 is not None else current["4m"]
+            actual = payload.actual if payload.actual is not None else current["actual"]
+            factor = payload.factor if payload.factor is not None else current["factor"]
+            control_point = payload.control_point if payload.control_point is not None else current["control_point"]
+            standard = payload.standard if payload.standard is not None else current["standard"]
+            met_standard = payload.met_standard if payload.met_standard is not None else current["met_standard"]
+            met_safety = payload.met_safety if payload.met_safety is not None else current["met_safety"]
+            comments = payload.comments if payload.comments is not None else current["comments"]
             
             cur.execute(
-                """UPDATE factor_tree SET unsafe_act = %s, unsafe_condition = %s, personal_factor = %s, work_factor = %s, root_cause = %s
+                """UPDATE factor_tree SET "4m" = %s, actual = %s, factor = %s, control_point = %s, standard = %s, met_standard = %s, met_safety = %s, comments = %s
                    WHERE id = %s RETURNING *""",
-                [unsafe_act, unsafe_condition, personal_factor, work_factor, root_cause, id]
+                [m4, actual, factor, control_point, standard, met_standard, met_safety, comments, id]
             )
             return cur.fetchone()
 

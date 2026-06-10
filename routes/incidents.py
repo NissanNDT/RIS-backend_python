@@ -31,6 +31,14 @@ def get_incident_by_id(id: int):
                 raise HTTPException(status_code=404, detail="Incidente no encontrado")
             return incident
 
+def to_int_or_none(val):
+    if val is None or val == "":
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
 @router.post("/incidents")
 def create_incident(payload: dict, request: Request, user: dict = Depends(verify_token)):
     date_val = payload.get("date")
@@ -39,11 +47,11 @@ def create_incident(payload: dict, request: Request, user: dict = Depends(verify
     location_val = payload.get("location")
     injury_val = payload.get("injury")
     desc_val = payload.get("description")
-    id_area = payload.get("id_area")
-    id_plant = payload.get("id_plant")
+    id_area = to_int_or_none(payload.get("id_area"))
+    id_plant = to_int_or_none(payload.get("id_plant"))
     mechanism = payload.get("incident_mechanism")
     root_cause = payload.get("root_cause")
-    id_cost_center = payload.get("id_cost_center")
+    id_cost_center = to_int_or_none(payload.get("id_cost_center"))
 
     final_level = expand_level(level_val)
 
@@ -111,8 +119,10 @@ def update_incident(id: int, payload: dict):
                 level_val = payload.get("level")
                 final_level = expand_level(level_val) if level_val else incident["level"]
 
-                id_plant = payload.get("id_plant", incident["id_plant"])
-                id_area = payload.get("id_area", incident["id_area"])
+                id_plant_val = payload.get("id_plant")
+                id_plant = to_int_or_none(id_plant_val) if id_plant_val is not None else incident["id_plant"]
+                id_area_val = payload.get("id_area")
+                id_area = to_int_or_none(id_area_val) if id_area_val is not None else incident["id_area"]
                 
                 date_val = payload.get("date")
                 if date_val:
@@ -165,7 +175,8 @@ def update_incident(id: int, payload: dict):
                 desc_val = payload.get("description", incident["description"])
                 mechanism = payload.get("incident_mechanism", incident["incident_mechanism"])
                 root_cause = payload.get("root_cause", incident["root_cause"])
-                id_cost_center = payload.get("id_cost_center", incident["id_cost_center"])
+                id_cost_center_val = payload.get("id_cost_center")
+                id_cost_center = to_int_or_none(id_cost_center_val) if id_cost_center_val is not None else incident["id_cost_center"]
 
                 cur.execute(
                     """UPDATE incident SET

@@ -184,34 +184,62 @@ class IncidentImageCreate(BaseModel):
 # FactorTree
 class FactorTreeCreate(BaseModel):
     id_incident_format: int
-    unsafe_act: str
-    unsafe_condition: str
-    personal_factor: str
-    work_factor: str
-    root_cause: str
+    m4: str
+    actual: Optional[str] = None
+    factor: Optional[str] = None
+    control_point: Optional[str] = None
+    standard: Optional[str] = None
+    met_standard: Optional[bool] = None
+    met_safety: Optional[bool] = None
+    comments: Optional[str] = None
 
 class FactorTreeUpdate(BaseModel):
-    unsafe_act: Optional[str] = None
-    unsafe_condition: Optional[str] = None
-    personal_factor: Optional[str] = None
-    work_factor: Optional[str] = None
-    root_cause: Optional[str] = None
+    m4: Optional[str] = None
+    actual: Optional[str] = None
+    factor: Optional[str] = None
+    control_point: Optional[str] = None
+    standard: Optional[str] = None
+    met_standard: Optional[bool] = None
+    met_safety: Optional[bool] = None
+    comments: Optional[str] = None
 
 # InterveningFactor
 class InterveningFactorCreate(BaseModel):
     id_incident_format: int
-    description: str
+    name: str
 
 class InterveningFactorUpdate(BaseModel):
-    description: Optional[str] = None
+    name: Optional[str] = None
 
 # HazardBackground
 class HazardBackgroundCreate(BaseModel):
     id_incident_format: int
-    description: str
+    previous_fr1_incidents_presented: Optional[bool] = None
+    existing_processes_or_areas_potential_for_incident: Optional[bool] = None
+    processes_or_areas_potential_for_incident: Optional[str] = None
+    risk_assessed_and_identified: Optional[bool] = None
+    incident_category: Optional[str] = None
+    horizontal_review: Optional[bool] = None
+    horizontal_review_comment: Optional[str] = None
+    new_risk_assessment_needed: Optional[bool] = None
+    safety_dojo_reception_date: Optional[date] = None
+    genba_dojo_reception_date: Optional[date] = None
+    negligence_type: Optional[str] = None
+    labor_report: Optional[bool] = None
 
 class HazardBackgroundUpdate(BaseModel):
-    description: Optional[str] = None
+    previous_fr1_incidents_presented: Optional[bool] = None
+    existing_processes_or_areas_potential_for_incident: Optional[bool] = None
+    processes_or_areas_potential_for_incident: Optional[str] = None
+    risk_assessed_and_identified: Optional[bool] = None
+    incident_category: Optional[str] = None
+    horizontal_review: Optional[bool] = None
+    horizontal_review_comment: Optional[str] = None
+    new_risk_assessment_needed: Optional[bool] = None
+    safety_dojo_reception_date: Optional[date] = None
+    genba_dojo_reception_date: Optional[date] = None
+    negligence_type: Optional[str] = None
+    labor_report: Optional[bool] = None
 
 # CountermeasurePlan
 class CountermeasurePlanCreate(BaseModel):
@@ -258,9 +286,14 @@ class VerificationMethodUpdate(BaseModel):
 # AnalysisParticipant
 class AnalysisParticipantCreate(BaseModel):
     id_incident_format: int
-    department: str
+    participant_type: str
     name: str
+    department: str
+    id_cost_center: Optional[int] = None
 
 class AnalysisParticipantUpdate(BaseModel):
-    department: Optional[str] = None
+    participant_type: Optional[str] = None
     name: Optional[str] = None
+    department: Optional[str] = None
+    id_cost_center: Optional[int] = None
+

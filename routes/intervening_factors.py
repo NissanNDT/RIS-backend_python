@@ -34,8 +34,8 @@ def create_intervening_factor(payload: InterveningFactorCreate):
     with db_pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO intervening_factors (id_incident_format, description) VALUES (%s, %s) RETURNING *",
-                [payload.id_incident_format, payload.description]
+                "INSERT INTO intervening_factors (id_incident_format, name) VALUES (%s, %s) RETURNING *",
+                [payload.id_incident_format, payload.name]
             )
             return cur.fetchone()
 
@@ -48,11 +48,11 @@ def update_intervening_factor(id: int, payload: InterveningFactorUpdate):
             if not current:
                 raise HTTPException(status_code=404, detail="Factor interviniente no encontrado")
                 
-            description = payload.description if payload.description is not None else current["description"]
+            name = payload.name if payload.name is not None else current["name"]
             
             cur.execute(
-                "UPDATE intervening_factors SET description = %s WHERE id = %s RETURNING *",
-                [description, id]
+                "UPDATE intervening_factors SET name = %s WHERE id = %s RETURNING *",
+                [name, id]
             )
             return cur.fetchone()
 

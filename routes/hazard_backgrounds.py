@@ -31,11 +31,21 @@ def get_hazard_background_by_incident_format(id_incident_format: int):
 
 @router.post("/hazard-background", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_token)])
 def create_hazard_background(payload: HazardBackgroundCreate):
+    fields = [
+        "id_incident_format", "previous_fr1_incidents_presented", "existing_processes_or_areas_potential_for_incident",
+        "processes_or_areas_potential_for_incident", "risk_assessed_and_identified", "incident_category",
+        "horizontal_review", "horizontal_review_comment", "new_risk_assessment_needed",
+        "safety_dojo_reception_date", "genba_dojo_reception_date", "negligence_type", "labor_report"
+    ]
+    values = [getattr(payload, field) for field in fields]
+    columns = ", ".join(fields)
+    placeholders = ", ".join(["%s"] * len(fields))
+    
     with db_pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO hazard_background (id_incident_format, description) VALUES (%s, %s) RETURNING *",
-                [payload.id_incident_format, payload.description]
+                f"INSERT INTO hazard_background ({columns}) VALUES ({placeholders}) RETURNING *",
+                values
             )
             return cur.fetchone()
 
@@ -48,11 +58,30 @@ def update_hazard_background(id: int, payload: HazardBackgroundUpdate):
             if not current:
                 raise HTTPException(status_code=404, detail="Antecedente de peligro no encontrado")
                 
-            description = payload.description if payload.description is not None else current["description"]
+            fields = [
+                "id_incident_format", "previous_fr1_incidents_presented", "existing_processes_or_areas_potential_for_incident",
+                "processes_or_areas_potential_for_incident", "risk_assessed_and_identified", "incident_category",
+                "horizontal_review", "horizontal_review_comment", "new_risk_assessment_needed",
+                "safety_dojo_reception_date", "genba_dojo_reception_date", "negligence_type", "labor_report"
+            ]
+            
+            updates = []
+            values = []
+            for field in fields:
+                val = getattr(payload, field)
+                if val is not None:
+                    updates.append(f"{field} = %s")
+                    values.append(val)
+                else:
+                    updates.append(f"{field} = %s")
+                    values.append(current[field])
+            
+            values.append(id)
+            set_clause = ", ".join(updates)
             
             cur.execute(
-                "UPDATE hazard_background SET description = %s WHERE id = %s RETURNING *",
-                [description, id]
+                f"UPDATE hazard_background SET {set_clause} WHERE id = %s RETURNING *",
+                values
             )
             return cur.fetchone()
 
