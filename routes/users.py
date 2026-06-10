@@ -10,7 +10,7 @@ router = APIRouter()
 def get_users():
     try:
         users = query_db(
-            "SELECT id, id_plant, full_name, email, created_at, id_role FROM users ORDER BY created_at DESC",
+            "SELECT id, id_plant, full_name, email, created_at, id_role, id_general_sv, id_junior FROM users ORDER BY created_at DESC",
             fetch_all=True
         )
         return users
@@ -24,7 +24,7 @@ def get_users():
 def get_user_by_id(id: int):
     try:
         user = query_db(
-            "SELECT id, id_plant, full_name, email, created_at, id_role FROM users WHERE id = %s",
+            "SELECT id, id_plant, full_name, email, created_at, id_role, id_general_sv, id_junior FROM users WHERE id = %s",
             [id],
             fetch_one=True
         )
@@ -47,10 +47,10 @@ def create_user(payload: UserCreate):
     try:
         hashed_password = bcrypt.hashpw(payload.password.encode('utf-8'), bcrypt.gensalt(10)).decode('utf-8')
         user = query_db(
-            """INSERT INTO users (id_plant, full_name, email, password, id_role)
-               VALUES (%s, %s, %s, %s, %s)
-               RETURNING id, id_plant, full_name, email, created_at, id_role""",
-            [payload.id_plant, payload.full_name, payload.email, hashed_password, payload.id_role],
+            """INSERT INTO users (id_plant, full_name, email, password, id_role, id_general_sv, id_junior)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               RETURNING id, id_plant, full_name, email, created_at, id_role, id_general_sv, id_junior""",
+            [payload.id_plant, payload.full_name, payload.email, hashed_password, payload.id_role, payload.id_general_sv, payload.id_junior],
             fetch_one=True
         )
         return {
@@ -80,33 +80,31 @@ def update_user(id: int, payload: UserUpdate):
             )
 
         fields_to_update = {}
-        if payload.id_plant is not None:
-            fields_to_update["id_plant"] = payload.id_plant
-        if payload.full_name is not None:
-            fields_to_update["full_name"] = payload.full_name
-        if payload.email is not None:
-            fields_to_update["email"] = payload.email
-        if payload.id_role is not None:
-            fields_to_update["id_role"] = payload.id_role
-        if payload.password is not None:
+        updatable_fields = ["id_plant", "full_name", "email", "id_role", "id_general_sv", "id_junior"]
+        for field in updatable_fields:
+            if field in payload.model_fields_set:
+                fields_to_update[field] = getattr(payload, field)
+        
+        if "password" in payload.model_fields_set and payload.password is not None:
             fields_to_update["password"] = bcrypt.hashpw(payload.password.encode('utf-8'), bcrypt.gensalt(10)).decode('utf-8')
 
         if not fields_to_update:
-            # Just return current user fields (excluding password)
             return {
                 "id": current["id"],
                 "id_plant": current["id_plant"],
                 "full_name": current["full_name"],
                 "email": current["email"],
                 "created_at": current["created_at"],
-                "id_role": current["id_role"]
+                "id_role": current["id_role"],
+                "id_general_sv": current["id_general_sv"],
+                "id_junior": current["id_junior"]
             }
 
         set_clause = ", ".join(f"{k} = %s" for k in fields_to_update.keys())
         params = list(fields_to_update.values()) + [id]
 
         updated_user = query_db(
-            f"UPDATE users SET {set_clause} WHERE id = %s RETURNING id, id_plant, full_name, email, created_at, id_role",
+            f"UPDATE users SET {set_clause} WHERE id = %s RETURNING id, id_plant, full_name, email, created_at, id_role, id_general_sv, id_junior",
             params,
             fetch_one=True
         )

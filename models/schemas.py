@@ -14,6 +14,8 @@ class UserCreate(BaseModel):
     email: str
     password: str
     id_role: int
+    id_general_sv: Optional[int] = None
+    id_junior: Optional[int] = None
 
 class UserUpdate(BaseModel):
     id_plant: Optional[int] = None
@@ -21,6 +23,8 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     id_role: Optional[int] = None
+    id_general_sv: Optional[int] = None
+    id_junior: Optional[int] = None
 
 # Area
 class AreaRequest(BaseModel):

@@ -68,13 +68,14 @@ def update_hazard_background(id: int, payload: HazardBackgroundUpdate):
             updates = []
             values = []
             for field in fields:
-                val = getattr(payload, field)
-                if val is not None:
-                    updates.append(f"{field} = %s")
-                    values.append(val)
-                else:
-                    updates.append(f"{field} = %s")
-                    values.append(current[field])
+                if hasattr(payload, field):
+                    val = getattr(payload, field)
+                    if val is not None:
+                        updates.append(f"{field} = %s")
+                        values.append(val)
+                        continue
+                updates.append(f"{field} = %s")
+                values.append(current[field])
             
             values.append(id)
             set_clause = ", ".join(updates)
